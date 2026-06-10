@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
   import { formatDuration, phaseLabel } from "$lib/types";
   import { settings } from "$lib/stores/settings";
   import {
@@ -13,11 +14,41 @@
   } from "$lib/stores/timer";
 
   let energyInput = $state(3);
+  let now = $state(new Date());
+
+  let clockInterval: ReturnType<typeof setInterval> | null = null;
+
+  onMount(() => {
+    clockInterval = setInterval(() => {
+      now = new Date();
+    }, 1000);
+  });
+
+  onDestroy(() => {
+    if (clockInterval) clearInterval(clockInterval);
+  });
 
   const timerState = $derived($timer);
   const progress = $derived(getProgress(timerState));
   const circumference = 2 * Math.PI * 88;
   const dashOffset = $derived(circumference * (1 - progress));
+
+  const dateLabel = $derived(
+    now.toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
+  );
+
+  const timeLabel = $derived(
+    now.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }),
+  );
 
   async function handleStart() {
     setEnergyBefore(energyInput);
@@ -30,6 +61,11 @@
 </script>
 
 <section class="timer panel">
+  <div class="datetime-bar">
+    <p class="current-date">{dateLabel}</p>
+    <p class="current-time" aria-live="polite">{timeLabel}</p>
+  </div>
+
   <div class="timer-layout">
     <div class="ring-wrap">
       <svg viewBox="0 0 200 200" class="ring" aria-hidden="true">
@@ -97,6 +133,27 @@
 </section>
 
 <style>
+  .datetime-bar {
+    text-align: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .current-date {
+    margin: 0 0 0.25rem;
+    font-size: 0.95rem;
+    color: var(--color-text-muted);
+  }
+
+  .current-time {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
   .timer-layout {
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);

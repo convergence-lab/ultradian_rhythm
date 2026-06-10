@@ -41,6 +41,31 @@ npm run tauri dev
 npm run tauri build
 ```
 
+Installers are generated under `src-tauri/target/release/bundle/`:
+
+- `deb/` — Debian package (recommended on Linux Mint / Ubuntu)
+- `appimage/` — portable AppImage (no install required)
+- `rpm/` — RPM package
+
+## Install (Linux)
+
+### Option A: .deb (system install, recommended)
+
+```bash
+sudo dpkg -i "src-tauri/target/release/bundle/deb/Ultradian Rhythm_0.1.0_amd64.deb"
+```
+
+After install, launch **Ultradian Rhythm** from the application menu.
+
+### Option B: AppImage (portable)
+
+```bash
+chmod +x "src-tauri/target/release/bundle/appimage/Ultradian Rhythm_0.1.0_amd64.AppImage"
+./src-tauri/target/release/bundle/appimage/Ultradian\ Rhythm_0.1.0_amd64.AppImage
+```
+
+Copy the AppImage anywhere (e.g. `~/Applications/`) and run it directly.
+
 ## Project structure
 
 - `src/` — SvelteKit frontend

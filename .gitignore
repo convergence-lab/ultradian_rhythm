@@ -11,3 +11,6 @@ vite.config.ts.timestamp-*
 
 # Rust
 /src-tauri/target
+
+# Release installers
+/dist
