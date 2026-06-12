@@ -112,7 +112,6 @@ async function completeCurrentPhase(
       metrics?.note ?? null,
     );
     await notifyPhaseComplete(kind);
-    emitSessionsChanged();
 
     const currentSettings = get(settings);
 
@@ -128,6 +127,7 @@ async function completeCurrentPhase(
 
     timer.set(initialState());
     await notifyPhaseChange("idle");
+    emitSessionsChanged();
   } finally {
     isTransitioning = false;
   }
@@ -161,7 +161,12 @@ export async function skipCurrentPhase(): Promise<void> {
   await completeCurrentPhase(false);
 }
 
-export function resetTimer(): void {
+export async function resetTimer(): Promise<void> {
+  const state = get(timer);
+  if (state.phase !== "idle" && state.currentSessionId !== null) {
+    await finishSession(state.currentSessionId, false);
+    emitSessionsChanged();
+  }
   stopTick();
   isTransitioning = false;
   timer.set(initialState());

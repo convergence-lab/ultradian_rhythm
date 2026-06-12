@@ -1,6 +1,10 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { DayStats, Session, SessionKind } from "./types";
-import { endOfDayIso, startOfDayIso } from "./types";
+import {
+  computeDayStats,
+  endOfDayIso,
+  startOfDayIso,
+} from "./types";
 
 let db: Database | null = null;
 
@@ -103,7 +107,7 @@ export async function getRecentSessions(limit = 20): Promise<Session[]> {
   );
 }
 
-export async function getTodaySessions(): Promise<Session[]> {
+export async function getSessionsForDate(date: Date): Promise<Session[]> {
   const database = await getDb();
   return database.select<Session[]>(
     `SELECT id, kind, started_at, ended_at, planned_minutes, completed,
@@ -111,42 +115,43 @@ export async function getTodaySessions(): Promise<Session[]> {
      FROM sessions
      WHERE started_at >= $1 AND started_at <= $2
      ORDER BY started_at ASC`,
-    [startOfDayIso(), endOfDayIso()],
+    [startOfDayIso(date), endOfDayIso(date)],
   );
 }
 
+export async function getTodaySessions(): Promise<Session[]> {
+  return getSessionsForDate(new Date());
+}
+
+export async function getDayStatsForDate(date: Date): Promise<DayStats> {
+  const sessions = await getSessionsForDate(date);
+  return computeDayStats(sessions);
+}
+
 export async function getDayStats(): Promise<DayStats> {
-  const sessions = await getTodaySessions();
-  const completedActivities = sessions.filter(
-    (session) => session.kind === "activity" && session.completed === 1,
+  return getDayStatsForDate(new Date());
+}
+
+export async function getSessionsForDateRange(
+  start: Date,
+  end: Date,
+): Promise<Session[]> {
+  const database = await getDb();
+  return database.select<Session[]>(
+    `SELECT id, kind, started_at, ended_at, planned_minutes, completed,
+            energy_before, energy_after, focus_rating, note
+     FROM sessions
+     WHERE started_at >= $1 AND started_at <= $2
+     ORDER BY started_at ASC`,
+    [startOfDayIso(start), endOfDayIso(end)],
   );
-  const focusRatings = completedActivities
-    .map((session) => session.focus_rating)
-    .filter((rating): rating is number => rating !== null);
+}
 
-  const totalFocusMinutes = completedActivities.reduce((total, session) => {
-    if (session.ended_at) {
-      const durationMs =
-        new Date(session.ended_at).getTime() -
-        new Date(session.started_at).getTime();
-      return total + Math.round(durationMs / 60000);
-    }
-    return total + session.planned_minutes;
-  }, 0);
-
-  const averageFocus =
-    focusRatings.length > 0
-      ? focusRatings.reduce((sum, rating) => sum + rating, 0) /
-        focusRatings.length
-      : null;
-
-  const completedRests = sessions.filter(
-    (session) => session.kind === "rest" && session.completed === 1,
-  ).length;
-
-  return {
-    completedCycles: Math.min(completedActivities.length, completedRests),
-    totalFocusMinutes,
-    averageFocus,
-  };
+export async function getEarliestSessionDate(): Promise<Date | null> {
+  const database = await getDb();
+  const rows = await database.select<{ started_at: string }[]>(
+    `SELECT started_at FROM sessions ORDER BY started_at ASC LIMIT 1`,
+  );
+  if (!rows[0]) return null;
+  return new Date(rows[0].started_at);
 }

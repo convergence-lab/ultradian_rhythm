@@ -72,3 +72,70 @@ export function endOfDayIso(date = new Date()): string {
   end.setHours(23, 59, 59, 999);
   return end.toISOString();
 }
+
+export function startOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function addDays(date: Date, days: number): Date {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+export function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function fromDateInputValue(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function computeDayStats(sessions: Session[]): DayStats {
+  const completedActivities = sessions.filter(
+    (session) => session.kind === "activity" && session.completed === 1,
+  );
+  const focusRatings = completedActivities
+    .map((session) => session.focus_rating)
+    .filter((rating): rating is number => rating !== null);
+
+  const totalFocusMinutes = completedActivities.reduce((total, session) => {
+    if (session.ended_at) {
+      const durationMs =
+        new Date(session.ended_at).getTime() -
+        new Date(session.started_at).getTime();
+      return total + Math.round(durationMs / 60000);
+    }
+    return total + session.planned_minutes;
+  }, 0);
+
+  const averageFocus =
+    focusRatings.length > 0
+      ? focusRatings.reduce((sum, rating) => sum + rating, 0) /
+        focusRatings.length
+      : null;
+
+  const completedRests = sessions.filter(
+    (session) => session.kind === "rest" && session.completed === 1,
+  ).length;
+
+  return {
+    completedCycles: Math.min(completedActivities.length, completedRests),
+    totalFocusMinutes,
+    averageFocus,
+  };
+}
