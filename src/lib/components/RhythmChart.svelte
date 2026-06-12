@@ -1,16 +1,16 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { get } from "svelte/store";
   import {
     getEarliestSessionDate,
     getSessionsForDateRange,
   } from "$lib/db";
   import { onSessionsChanged, timer } from "$lib/stores/timer";
-  import type { DayStats, Session } from "$lib/types";
+  import type { ActiveSessionTiming, DayStats, Session } from "$lib/types";
   import {
     addDays,
     computeDayStats,
     isSameDay,
+    sessionChartEndMs,
     startOfDay,
     toDateInputValue,
   } from "$lib/types";
@@ -48,6 +48,14 @@
     `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
   );
 
+  const timerState = $derived($timer);
+
+  const activeTiming = $derived<ActiveSessionTiming>({
+    activeSessionId: timerState.currentSessionId,
+    pausedAt: timerState.pausedAt,
+    totalPausedMs: timerState.totalPausedMs,
+  });
+
   async function loadData() {
     const seq = ++loadSeq;
     const rangeStart = addDays(weekEnd, -(WEEK_DAYS - 1));
@@ -70,14 +78,15 @@
     dayRows = Array.from({ length: WEEK_DAYS }, (_, index) => {
       const date = addDays(weekStart, index);
       const daySessions = grouped.get(toDateInputValue(date)) ?? [];
+      const timing = isSameDay(date, today) ? activeTiming : undefined;
       return {
         date,
         sessions: daySessions,
-        stats: computeDayStats(daySessions),
+        stats: computeDayStats(daySessions, timing),
       };
     });
 
-    weekStats = computeDayStats(sessions);
+    weekStats = computeDayStats(sessions, activeTiming);
   }
 
   onMount(() => {
@@ -127,18 +136,8 @@
   }
 
   function sessionEndMs(session: Session, dayDate: Date): number {
-    const start = new Date(session.started_at).getTime();
-
-    if (session.ended_at) {
-      return new Date(session.ended_at).getTime();
-    }
-
-    const activeId = get(timer).currentSessionId;
-    if (session.id === activeId && isSameDay(dayDate, today)) {
-      return Date.now();
-    }
-
-    return start;
+    const timing = isSameDay(dayDate, today) ? activeTiming : undefined;
+    return sessionChartEndMs(session, timing);
   }
 
   function blockPosition(

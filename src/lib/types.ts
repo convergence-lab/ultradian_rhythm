@@ -8,10 +8,17 @@ export interface Session {
   ended_at: string | null;
   planned_minutes: number;
   completed: number;
+  paused_ms: number;
   energy_before: number | null;
   energy_after: number | null;
   focus_rating: number | null;
   note: string | null;
+}
+
+export interface ActiveSessionTiming {
+  activeSessionId: number | null;
+  pausedAt: string | null;
+  totalPausedMs: number;
 }
 
 export interface Settings {
@@ -35,6 +42,8 @@ export interface TimerState {
   isRunning: boolean;
   currentSessionId: number | null;
   energyBefore: number | null;
+  pausedAt: string | null;
+  totalPausedMs: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -105,7 +114,42 @@ export function fromDateInputValue(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
-export function computeDayStats(sessions: Session[]): DayStats {
+export function sessionActiveDurationMs(
+  session: Session,
+  timing?: ActiveSessionTiming,
+): number {
+  const start = new Date(session.started_at).getTime();
+  const isActive = timing?.activeSessionId === session.id && !session.ended_at;
+
+  let wallEnd: number;
+  let pausedMs = session.paused_ms ?? 0;
+
+  if (session.ended_at) {
+    wallEnd = new Date(session.ended_at).getTime();
+  } else if (isActive && timing) {
+    pausedMs = timing.totalPausedMs;
+    wallEnd = timing.pausedAt
+      ? new Date(timing.pausedAt).getTime()
+      : Date.now();
+  } else {
+    return 0;
+  }
+
+  return Math.max(0, wallEnd - start - pausedMs);
+}
+
+export function sessionChartEndMs(
+  session: Session,
+  timing?: ActiveSessionTiming,
+): number {
+  const start = new Date(session.started_at).getTime();
+  return start + sessionActiveDurationMs(session, timing);
+}
+
+export function computeDayStats(
+  sessions: Session[],
+  timing?: ActiveSessionTiming,
+): DayStats {
   const completedActivities = sessions.filter(
     (session) => session.kind === "activity" && session.completed === 1,
   );
@@ -114,13 +158,8 @@ export function computeDayStats(sessions: Session[]): DayStats {
     .filter((rating): rating is number => rating !== null);
 
   const totalFocusMinutes = completedActivities.reduce((total, session) => {
-    if (session.ended_at) {
-      const durationMs =
-        new Date(session.ended_at).getTime() -
-        new Date(session.started_at).getTime();
-      return total + Math.round(durationMs / 60000);
-    }
-    return total + session.planned_minutes;
+    const durationMs = sessionActiveDurationMs(session, timing);
+    return total + Math.round(durationMs / 60000);
   }, 0);
 
   const averageFocus =

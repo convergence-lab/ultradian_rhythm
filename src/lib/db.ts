@@ -8,6 +8,9 @@ import {
 
 let db: Database | null = null;
 
+const SESSION_COLUMNS = `id, kind, started_at, ended_at, planned_minutes, completed,
+  paused_ms, energy_before, energy_after, focus_rating, note`;
+
 export async function getDb(): Promise<Database> {
   if (!db) {
     db = await Database.load("sqlite:ultradian.db");
@@ -36,6 +39,7 @@ export async function createSession(
 export async function finishSession(
   sessionId: number,
   completed: boolean,
+  pausedMs = 0,
   energyAfter: number | null = null,
   focusRating: number | null = null,
   note: string | null = null,
@@ -43,11 +47,12 @@ export async function finishSession(
   const database = await getDb();
   await database.execute(
     `UPDATE sessions
-     SET ended_at = $1, completed = $2, energy_after = $3, focus_rating = $4, note = $5
-     WHERE id = $6`,
+     SET ended_at = $1, completed = $2, paused_ms = $3, energy_after = $4, focus_rating = $5, note = $6
+     WHERE id = $7`,
     [
       new Date().toISOString(),
       completed ? 1 : 0,
+      pausedMs,
       energyAfter,
       focusRating,
       note,
@@ -98,8 +103,7 @@ export async function updateSessionMetrics(
 export async function getRecentSessions(limit = 20): Promise<Session[]> {
   const database = await getDb();
   return database.select<Session[]>(
-    `SELECT id, kind, started_at, ended_at, planned_minutes, completed,
-            energy_before, energy_after, focus_rating, note
+    `SELECT ${SESSION_COLUMNS}
      FROM sessions
      ORDER BY started_at DESC
      LIMIT $1`,
@@ -110,8 +114,7 @@ export async function getRecentSessions(limit = 20): Promise<Session[]> {
 export async function getSessionsForDate(date: Date): Promise<Session[]> {
   const database = await getDb();
   return database.select<Session[]>(
-    `SELECT id, kind, started_at, ended_at, planned_minutes, completed,
-            energy_before, energy_after, focus_rating, note
+    `SELECT ${SESSION_COLUMNS}
      FROM sessions
      WHERE started_at >= $1 AND started_at <= $2
      ORDER BY started_at ASC`,
@@ -138,8 +141,7 @@ export async function getSessionsForDateRange(
 ): Promise<Session[]> {
   const database = await getDb();
   return database.select<Session[]>(
-    `SELECT id, kind, started_at, ended_at, planned_minutes, completed,
-            energy_before, energy_after, focus_rating, note
+    `SELECT ${SESSION_COLUMNS}
      FROM sessions
      WHERE started_at >= $1 AND started_at <= $2
      ORDER BY started_at ASC`,

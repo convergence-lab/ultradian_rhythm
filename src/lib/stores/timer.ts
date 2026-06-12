@@ -12,7 +12,17 @@ const initialState = (): TimerState => ({
   isRunning: false,
   currentSessionId: null,
   energyBefore: null,
+  pausedAt: null,
+  totalPausedMs: 0,
 });
+
+function getSessionPausedMs(state: TimerState): number {
+  let total = state.totalPausedMs;
+  if (state.pausedAt) {
+    total += Date.now() - new Date(state.pausedAt).getTime();
+  }
+  return total;
+}
 
 export const timer = writable<TimerState>(initialState());
 
@@ -77,6 +87,8 @@ async function beginPhase(
     isRunning: true,
     currentSessionId: sessionId,
     energyBefore,
+    pausedAt: null,
+    totalPausedMs: 0,
   });
 
   await notifyPhaseChange(phase);
@@ -107,6 +119,7 @@ async function completeCurrentPhase(
     await finishSession(
       state.currentSessionId,
       wasCompleted,
+      getSessionPausedMs(state),
       metrics?.energyAfter ?? null,
       metrics?.focusRating ?? null,
       metrics?.note ?? null,
@@ -141,9 +154,13 @@ export async function startActivity(energyBefore: number | null = null): Promise
 
 export function pause(): void {
   const state = get(timer);
-  if (state.phase === "idle" || !state.isRunning) return;
+  if (state.phase === "idle" || !state.isRunning || state.pausedAt) return;
   stopTick();
-  timer.update((current) => ({ ...current, isRunning: false }));
+  timer.update((current) => ({
+    ...current,
+    isRunning: false,
+    pausedAt: new Date().toISOString(),
+  }));
 }
 
 export function resume(): void {
@@ -151,7 +168,17 @@ export function resume(): void {
   if (state.phase === "idle" || state.isRunning || state.remainingSeconds <= 0) {
     return;
   }
-  timer.update((current) => ({ ...current, isRunning: true }));
+  timer.update((current) => {
+    const additionalPause = current.pausedAt
+      ? Date.now() - new Date(current.pausedAt).getTime()
+      : 0;
+    return {
+      ...current,
+      isRunning: true,
+      pausedAt: null,
+      totalPausedMs: current.totalPausedMs + additionalPause,
+    };
+  });
   startTick();
 }
 
@@ -164,7 +191,7 @@ export async function skipCurrentPhase(): Promise<void> {
 export async function resetTimer(): Promise<void> {
   const state = get(timer);
   if (state.phase !== "idle" && state.currentSessionId !== null) {
-    await finishSession(state.currentSessionId, false);
+    await finishSession(state.currentSessionId, false, getSessionPausedMs(state));
     emitSessionsChanged();
   }
   stopTick();
