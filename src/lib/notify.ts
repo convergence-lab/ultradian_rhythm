@@ -4,6 +4,7 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { get } from "svelte/store";
+import { showDesktopFlash, showPhasePopup } from "./phaseAlert";
 import type { Phase } from "./types";
 import { settings } from "./stores/settings";
 
@@ -45,19 +46,28 @@ export async function notifyPhaseChange(phase: Phase): Promise<void> {
 
 export async function notifyPhaseComplete(kind: "activity" | "rest"): Promise<void> {
   const currentSettings = get(settings);
-  if (!currentSettings.notificationsEnabled) return;
 
-  if (!permissionGranted) {
-    await initNotifications();
+  if (currentSettings.flashOnPhaseEnd) {
+    void showDesktopFlash(kind);
   }
-  if (!permissionGranted) return;
 
-  const title =
-    kind === "activity" ? "Activity complete" : "Rest complete";
-  const body =
-    kind === "activity"
-      ? "Great work. Time for a restorative break."
-      : "Break finished. Start the next focus block when ready.";
+  if (currentSettings.notificationsEnabled) {
+    if (!permissionGranted) {
+      await initNotifications();
+    }
+    if (permissionGranted) {
+      const title =
+        kind === "activity" ? "Activity complete" : "Rest complete";
+      const body =
+        kind === "activity"
+          ? "Great work. Time for a restorative break."
+          : "Break finished. Start the next focus block when ready.";
 
-  sendNotification({ title, body });
+      sendNotification({ title, body });
+    }
+  }
+
+  if (currentSettings.popupOnPhaseEnd) {
+    await showPhasePopup(kind);
+  }
 }

@@ -14,6 +14,8 @@
       restMinutes: Math.max(5, Math.min(60, draft.restMinutes)),
       autoStart: draft.autoStart,
       notificationsEnabled: draft.notificationsEnabled,
+      flashOnPhaseEnd: draft.flashOnPhaseEnd,
+      popupOnPhaseEnd: draft.popupOnPhaseEnd,
     });
   }
 
@@ -58,6 +60,16 @@
     <label class="toggle">
       <input type="checkbox" bind:checked={draft.notificationsEnabled} />
       <span>Desktop notifications on phase changes</span>
+    </label>
+
+    <label class="toggle">
+      <input type="checkbox" bind:checked={draft.flashOnPhaseEnd} />
+      <span>Flash the screen when a phase ends</span>
+    </label>
+
+    <label class="toggle">
+      <input type="checkbox" bind:checked={draft.popupOnPhaseEnd} />
+      <span>Show a popup when a phase ends</span>
     </label>
   </div>
 

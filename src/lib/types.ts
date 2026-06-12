@@ -26,6 +26,8 @@ export interface Settings {
   restMinutes: number;
   autoStart: boolean;
   notificationsEnabled: boolean;
+  flashOnPhaseEnd: boolean;
+  popupOnPhaseEnd: boolean;
 }
 
 export interface DayStats {
@@ -51,6 +53,8 @@ export const DEFAULT_SETTINGS: Settings = {
   restMinutes: 20,
   autoStart: true,
   notificationsEnabled: true,
+  flashOnPhaseEnd: true,
+  popupOnPhaseEnd: true,
 };
 
 export function formatDuration(totalSeconds: number): string {
